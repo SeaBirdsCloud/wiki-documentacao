@@ -70,14 +70,26 @@
     #positivo {
         color: #3bcf36;
     }
-
+    .btn-danger {
+        background: linear-gradient(135deg, #f56a6a, #dc3545) !important;
+        }
     .btn-success {
         background: linear-gradient(135deg, #58c98a, #34a853) !important;
     }
-
+    .btn-outline-danger:hover {
+        background: linear-gradient(135deg, #f56a6a, #dc3545) !important;
+        color: #fff !important;
+    }
     .btn-outline-success:hover {
         background: linear-gradient(135deg, #58c98a, #34a853) !important;
         color: #fff !important;
+    }
+    /* Outline buttons viram translúcidos com contraste leve */
+    .btn-outline-danger {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+    color: #333 !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    backdrop-filter: blur(4px);
     }
 </style>
 
