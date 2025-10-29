@@ -1,0 +1,364 @@
+<!--
+##############################################################
+# Desenvolvido por: Lucas Perdigão de Oliveira
+# Data: 29-10-2025
+#
+# Descrição:
+# Wiki para criação e gerenciamento de documentações, com suporte à:
+#  - Adição e gerenciamento de usuários e suas hierarquias
+#  - Criação e organização de hierarquias de documentações
+#  - Adição, edição e exclusão de documentações
+#  - Retenção automática de documentações excluídas por até 7 dias
+#
+##############################################################
+-->
+
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Barra do navegador clara em mobile -->
+<meta name="theme-color" content="#ffffff">
+
+<!-- Failsafe para frameworks (Tailwind, Bootstrap etc.) -->
+<script>
+  const r = document.documentElement;
+  r.classList.remove('dark');
+  r.setAttribute('data-theme','light');
+  r.setAttribute('data-bs-theme','light');
+</script>
+
+<div class="toolbar d-flex align-items-center mb-3 gap-2 flex-wrap">
+  <form class="flex-grow-1" method="get">
+    <div class="input-group">
+      <input name="q" value="{{ q }}" class="form-control" placeholder="Buscar por título, categoria ou conteúdo...">
+      <button class="btn btn-outline-secondary">Buscar</button>
+    </div>
+  </form>
+
+  {% if session.get('nivel') == 'n3' %}
+  <a class="btn btn-primary" href="{{ url_for('new_doc') }}">Nova documentação</a>
+  <a class="btn btn-warning" href="{{ url_for('trash') }}">Lixeira</a>
+  <a class="btn btn-success" href="{{ url_for('admin_users') }}">Usuários</a>
+  {% endif %}
+
+  <a href="{{ url_for('home') }}" class="btn btn-outline-secondary btn-sm">← Voltar</a>
+</div>
+
+{% if q %}
+<p class="text-muted mb-3">Resultados para <strong>{{ q }}</strong></p>
+{% endif %}
+
+<style>
+/* ============================
+   ESTILO MODERNO E SUAVE
+   ============================ */
+
+/* ---- BOTÕES ---- */
+.btn {
+  font-weight: 500;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 0.95rem;
+  border: none !important;
+  border-radius: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  color: #fff !important;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  letter-spacing: 0.02em;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  filter: brightness(1.05);
+}
+
+/* Cores modernas e suaves */
+.btn-primary {
+  background: linear-gradient(135deg, #4a90e2, #357ae8) !important;
+}
+.btn-success {
+  background: linear-gradient(135deg, #58c98a, #34a853) !important;
+}
+.btn-warning {
+  background: linear-gradient(135deg, #f9cf58, #f7b500) !important;
+  color: #fff !important;
+}
+.btn-danger {
+  background: linear-gradient(135deg, #f56a6a, #dc3545) !important;
+}
+.btn-secondary {
+  background: linear-gradient(135deg, #adb5bd, #868e96) !important;
+}
+.btn-info {
+  background: linear-gradient(135deg, #66d1ff, #0dcaf0) !important;
+}
+
+/* Hover mais suave */
+.btn:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 0.25rem rgba(90, 150, 255, 0.2) !important;
+}
+
+/* Outline buttons viram translúcidos com contraste leve */
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-warning,
+.btn-outline-danger,
+.btn-outline-secondary,
+.btn-outline-info {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  color: #333 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(4px);
+}
+
+.btn-outline-primary:hover {
+  background: linear-gradient(135deg, #4a90e2, #357ae8) !important;
+  color: #fff !important;
+}
+.btn-outline-success:hover {
+  background: linear-gradient(135deg, #58c98a, #34a853) !important;
+  color: #fff !important;
+}
+.btn-outline-warning:hover {
+  background: linear-gradient(135deg, #f9cf58, #f7b500) !important;
+  color: #fff !important;
+}
+.btn-outline-danger:hover {
+  background: linear-gradient(135deg, #f56a6a, #dc3545) !important;
+  color: #fff !important;
+}
+.btn-outline-secondary:hover {
+  background: linear-gradient(135deg, #adb5bd, #868e96) !important;
+  color: #fff !important;
+}
+.btn-outline-info:hover {
+  background: linear-gradient(135deg, #66d1ff, #0dcaf0) !important;
+  color: #fff !important;
+}
+
+/* ---- META (informações menores e suaves) ---- */
+.doc-meta {
+  font-size: 0.8rem;
+  color: #888 !important;
+  border-top: 1px solid #eee;
+  padding-top: 0.4rem;
+  margin-top: 0.8rem;
+  line-height: 1.4;
+}
+.doc-meta b {
+  color: #555 !important;
+  font-weight: 500;
+}
+
+/* ---- TIPOGRAFIA ---- */
+.doc-card-title {
+  font-weight: 600;
+  color: #222;
+  letter-spacing: -0.01em;
+}
+
+.doc-card-desc {
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+/* ---- FUNDO DOS CARDS ---- */
+.card {
+  background-color: #ffffff !important;
+  border: 1px solid #eaeaea !important;
+  border-radius: 0.8rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.25s ease-in-out;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+/* ---- CAMPO DE BUSCA ---- */
+.form-control {
+  background: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+  color: #333 !important;
+  border-radius: 0.6rem 0 0 0.6rem !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) inset;
+  transition: all 0.2s ease;
+}
+
+.form-control:focus {
+  border-color: #4a90e2 !important;
+  box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25) !important;
+}
+
+/* ---- BADGES ---- */
+.badge-category {
+  background: #eef4ff !important;
+  color: #2c62e0 !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  letter-spacing: 0.03em;
+}
+
+.badge.bg-info {
+  background: #e7f9ff !important;
+  color: #007da8 !important;
+  font-weight: 500;
+}
+
+/* ---- ESPAÇAMENTO SUAVE ---- */
+.card-actions .btn {
+  flex: 1;
+  margin-top: 0.25rem;
+}
+
+/* ---- TRANSIÇÕES ---- */
+.btn,
+.card,
+.form-control {
+  transition: all 0.25s ease-in-out;
+}
+
+  .doc-card-desc h1 { font-size: 1.3rem; }
+  .doc-card-desc h2 { font-size: 1.15rem; }
+  .doc-card-desc h3 { font-size: 1.05rem; }
+  .doc-card-desc h4 { font-size: 0.95rem; }
+  .doc-card-desc h5 { font-size: 0.9rem; }
+  .doc-card-desc h6 { font-size: 0.85rem; }
+
+  /* Remove o sublinhado (underline) do botão "Cancelar" */
+.btn-outline-primary,
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary:active {
+  text-decoration: none !important;
+}
+
+.btn-outline-secondary,
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus,
+.btn-outline-secondary:active {
+  text-decoration: none !important;
+}
+
+/* ---- EMPTY STATE ---- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+
+  min-height: 60vh;
+  border: 2px dashed #d0d7de;
+  border-radius: 0.8rem;
+  background-color: #fafafa;
+
+  color: #666;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  transition: all 0.3s ease;
+}
+
+.empty-state:hover {
+  border-color: #c0c6cc;
+  background-color: #fefefe;
+}
+
+.empty-state p {
+  font-size: 1.05rem;
+  margin-bottom: 1rem;
+}
+</style>
+
+<div class="row g-3">
+  {% for doc in items %}
+  {% set meta = doc.meta or doc.get('meta', {}) %}
+  {% set img_url = meta.get('cover_url') or meta.get('icon_url') %}
+  {% set cat = doc.category or doc.get('category') %}
+  {% set desc = doc.description or doc.get('description') or doc.excerpt or doc.get('excerpt') or doc.summary or doc.get('summary') %}
+  {% set tags = meta.get('tags') or doc.get('tags', []) %}
+  {% if tags %}
+  {% set tags_list = tags if tags is iterable and tags is not string else tags.split(',') %}
+  {% endif %}
+
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100 shadow-sm overflow-hidden">
+      {% if img_url %}
+      <img src="{{ img_url }}" class="doc-card-cover" alt="Imagem da documentação">
+      {% else %}
+      <div class="doc-card-cover d-flex align-items-center justify-content-center text-muted small">Sem imagem</div>
+      {% endif %}
+
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h2 class="doc-card-title mb-0 js-highlight">{{ doc.title }}</h2>
+          {% if cat %}<span class="badge badge-category text-uppercase">{{ cat }}</span>{% endif %}
+        </div>
+
+        {% if desc %}
+        <div class="doc-card-desc js-highlight">{{ desc|truncate(200, True, "...")|safe }}</div>
+        {% else %}
+        <p class="doc-card-desc text-muted">Sem descrição.</p>
+        {% endif %}
+
+        {% if tags_list %}
+        <div class="d-flex flex-wrap gap-1 mb-3">
+          {% for tag in tags_list %}
+          {% if tag.strip() %}
+          <span class="badge bg-info text-dark px-2 py-1 small">#{{ tag.strip() }}</span>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="mt-auto d-flex gap-2 card-actions">
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('view_doc', slug=doc.slug) }}">Abrir</a>
+          {% if session.get('nivel') == 'n3' %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('edit_doc', slug=doc.slug) }}">Editar</a>
+          <form method="post" action="{{ url_for('remove_doc', slug=doc.slug) }}" onsubmit="return confirm('Excluir esta documentação?')">
+            <button class="btn btn-sm btn-outline-danger w-100">Excluir</button>
+          </form>
+          {% endif %}
+        </div>
+
+        {% if meta and (meta.get('created_by') or meta.get('created_at') or meta.get('last_edited_at')) %}
+        <div class="doc-meta mt-3">
+          {% if meta.get('created_by') %}Criado por <b>{{ meta.get('created_by') }}</b>{% endif %}
+          {% if meta.get('created_at') %} • {{ meta.get('created_at') }}{% endif %}
+          <br>
+          {% if meta.get('last_edited_by') %}Atualizado por <b>{{ meta.get('last_edited_by') }}</b>{% endif %}
+          {% if meta.get('last_edited_at') %} • {{ meta.get('last_edited_at') }}{% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="empty-state">
+      <p class="mb-3">Nenhuma documentação encontrada.</p>
+      <a class="btn btn-primary" href="{{ url_for('new_doc') }}">Criar a primeira</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+  // Realce simples do termo de busca
+  (function () {
+    const q = "{{ q|e }}".trim();
+    if (!q) return;
+    const regex = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ")", "gi");
+    document.querySelectorAll(".js-highlight").forEach(node => {
+      node.innerHTML = node.innerText.replace(regex, "<mark>$1</mark>");
+    });
+  })();
+</script>
+
+{% endblock %}

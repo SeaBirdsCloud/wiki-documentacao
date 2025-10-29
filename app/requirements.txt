@@ -1,0 +1,12 @@
+flask
+markdown
+pygments
+python-slugify
+GitPython
+werkzeug
+gunicorn
+python-frontmatter
+mysql-connector-python
+beautifulsoup4
+markupsafe
+python-dotenv

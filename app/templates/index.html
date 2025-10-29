@@ -1,0 +1,84 @@
+<!--
+##############################################################
+# Desenvolvido por: Lucas Perdigão de Oliveira
+# Data: 29-10-2025
+#
+# Descrição:
+# Wiki para criação e gerenciamento de documentações, com suporte à:
+#  - Adição e gerenciamento de usuários e suas hierarquias
+#  - Criação e organização de hierarquias de documentações
+#  - Adição, edição e exclusão de documentações
+#  - Retenção automática de documentações excluídas por até 7 dias
+#
+##############################################################
+-->
+
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-5">
+    <div class="text-center">
+        <h1 class="display-4 fw-bold mb-3">
+            Portfólio de Projetos da POSITIVO<span id="positivo"> S+</span>
+        </h1>
+
+        <p class="lead text-secondary mb-4">
+            Inovação, tecnologia e transformação digital em cada iniciativa.
+        </p>
+
+        <hr class="w-25 mx-auto mb-4">
+
+        <p class="fs-5 text-muted">
+            Explore soluções que impulsionam o futuro e conectam pessoas, ideias e resultados.
+            Cada projeto aqui representa o compromisso da <strong>Positivo S+</strong> com a
+            <strong>excelência</strong>, a <strong>criatividade</strong> e o <strong>impacto real</strong>.
+        </p>
+    </div>
+
+    <div class="row align-items-center mt-5">
+        <div class="col-md-6 text-center text-md-start">
+            <h2 class="fw-semibold text-dark">O que você vai encontrar aqui</h2>
+            <p class="text-muted mt-3">
+                Um espaço para descobrir como a <strong>Positivo</strong> está moldando o amanhã com
+                projetos que unem tecnologia, sustentabilidade e experiência humana.
+            </p>
+            <ul class="list-unstyled text-muted mt-3">
+                <li>💡 Soluções tecnológicas inovadoras</li>
+                <li>🌎 Projetos que geram impacto social e ambiental</li>
+                <li>🤝 Colaborações que impulsionam o ecossistema digital</li>
+            </ul>
+        </div>
+
+        <div class="col-md-6 text-center mt-4 mt-md-0">
+            <img src="{{ url_for('static', filename='img/icone.png') }}" alt="Inovação Positivo" class="img-fluid"
+                style="max-height: 280px;">
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-center gap-3 mt-4">
+        <a href="{{ url_for('docs') }}" class="btn btn-success btn-lg px-4">
+            🚀 Ver Projetos
+        </a>
+    </div>
+</div>
+
+<style>
+    img {
+        border-radius: 1rem;
+    }
+
+    #positivo {
+        color: #3bcf36;
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #58c98a, #34a853) !important;
+    }
+
+    .btn-outline-success:hover {
+        background: linear-gradient(135deg, #58c98a, #34a853) !important;
+        color: #fff !important;
+    }
+</style>
+
+{% endblock %}

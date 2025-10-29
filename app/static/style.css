@@ -1,0 +1,261 @@
+/* =============================
+   FORÇA O MODO CLARO SEMPRE
+   ============================= */
+:root {
+  color-scheme: light only;
+  --radius: 0.75rem;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 3px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 6px 16px rgba(0, 0, 0, 0.1);
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-bg: #f9fafb;
+  --color-card: #ffffff;
+  --color-border: #e5e7eb;
+  --color-text: #1f2937;
+  --color-muted: #6b7280;
+  --color-link: #2563eb;
+  --color-link-hover: #1d4ed8;
+  --color-primary: linear-gradient(135deg, #4a90e2, #357ae8);
+}
+
+html,
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* =============================
+   LAYOUT BÁSICO / NAVBAR
+   ============================= */
+.navbar {
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-card);
+  transition: all 0.3s ease;
+}
+
+.navbar-brand img {
+  transition: transform 0.25s ease;
+}
+
+.navbar-brand:hover img {
+  transform: scale(1.05);
+}
+
+/* =============================
+   CARDS
+   ============================= */
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  transition: all 0.25s ease-in-out;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-body {
+  padding: 1.25rem;
+  border-top: 1px solid #f3f4f6;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.card-body h1,
+.card-body h2,
+.card-body h3,
+.card-body h4,
+.card-body h5 {
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 1rem 0 0.6rem;
+}
+
+.card-body p {
+  color: var(--color-muted);
+  margin-bottom: 0.75rem;
+}
+
+.card-body a {
+  color: var(--color-link);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.card-body a:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+}
+
+/* =============================
+   FORMULÁRIOS / INPUTS
+   ============================= */
+.form-control,
+input,
+textarea,
+select {
+  width: 100%;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.9rem;
+  font-size: 0.95rem;
+  transition: all 0.25s ease;
+  box-shadow: var(--shadow-sm) inset;
+}
+
+.form-control::placeholder {
+  color: var(--color-muted);
+}
+
+.form-control:focus {
+  border-color: var(--color-link);
+  box-shadow: 0 0 0 0.25rem rgba(37, 99, 235, 0.15);
+  outline: none;
+}
+
+.form-control:hover:not(:disabled):not(:focus) {
+  background-color: #fcfcfc;
+  border-color: #cbd5e1;
+}
+
+.form-control:disabled {
+  background-color: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* =============================
+   BOTÕES
+   ============================= */
+.btn {
+  display: inline-block;
+  font-weight: 500;
+  border-radius: var(--radius);
+  padding: 0.55rem 1.2rem;
+  font-size: 0.95rem;
+  transition: all 0.25s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(74, 144, 226, 0.25);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.07);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(74, 144, 226, 0.35);
+}
+
+.btn-outline-secondary {
+  background: #fff;
+  color: var(--color-muted);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-outline-secondary:hover {
+  background: #f3f4f6;
+  color: var(--color-text);
+  transform: translateY(-2px);
+}
+
+.btn-outline-danger {
+  border: 1px solid #dc3545;
+  color: #dc3545;
+  background: transparent;
+}
+
+.btn-outline-danger:hover {
+  background: #dc3545;
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+/* =============================
+   EASYMDE / EDITOR
+   ============================= */
+.EasyMDEContainer {
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.EasyMDEContainer:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.editor-toolbar {
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.editor-toolbar button {
+  background: #f8fafc;
+  border: none;
+  border-radius: 0.4rem;
+  margin: 2px;
+  width: 32px;
+  height: 32px;
+  transition: all 0.2s ease;
+}
+
+.editor-toolbar button:hover {
+  background: linear-gradient(135deg, #eef4ff, #e3e9ff);
+  color: #2c62e0;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.CodeMirror {
+  min-height: 400px;
+  font-family: "JetBrains Mono", monospace;
+  background: var(--color-card);
+  color: var(--color-text);
+}
+
+/* =============================
+   ANIMAÇÕES
+   ============================= */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =============================
+   UTILIDADES
+   ============================= */
+.text-muted {
+  color: var(--color-muted) !important;
+}
+
+.markdown-body img {
+  display: block;
+  margin: 1.5rem auto;
+  max-width: 100%;
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-md);
+}

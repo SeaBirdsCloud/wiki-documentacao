@@ -1,0 +1,1402 @@
+<!--
+##############################################################
+# Desenvolvido por: Lucas Perdigão de Oliveira
+# Data: 29-10-2025
+#
+# Descrição:
+# Wiki para criação e gerenciamento de documentações, com suporte à:
+#  - Adição e gerenciamento de usuários e suas hierarquias
+#  - Criação e organização de hierarquias de documentações
+#  - Adição, edição e exclusão de documentações
+#  - Retenção automática de documentações excluídas por até 7 dias
+#
+##############################################################
+-->
+
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold">{{ "Nova documentação" if mode == "new" else "Editar documentação" }}</h2>
+  <a class="btn btn-outline-secondary" href="{{ url_for('docs') }}">← Voltar</a>
+</div>
+
+<div class="card shadow-sm fade-in">
+  <div class="card-body">
+    <form method="POST" enctype="multipart/form-data">
+
+      <!-- Nível de acesso -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Nível de acesso:</label>
+        <select name="access_level" class="form-select">
+          <option value="d1" {% if meta and meta.access_level=="d1" %}selected{% endif %}>Aberto (d1)</option>
+          <option value="d2" {% if meta and meta.access_level=="d2" %}selected{% endif %}>Restrito (d2)</option>
+          <option value="d3" {% if meta and meta.access_level=="d3" %}selected{% endif %}>Privado (d3)</option>
+        </select>
+      </div>
+
+      <!-- Título -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Título da documentação</label>
+        <input type="text" name="title" value="{{ title or '' }}" class="form-control form-control-lg"
+          placeholder="Ex: API de Usuários" required>
+      </div>
+
+      <!-- TAGS -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Tags</label>
+
+        {% if tags is iterable and tags is not string %}
+        {% set tags_list = tags %}
+        {% elif tags %}
+        {% set tags_list = tags.split(',') %}
+        {% else %}
+        {% set tags_list = [] %}
+        {% endif %}
+
+        <div id="tagsContainer" class="form-control d-flex flex-wrap align-items-center"
+          style="min-height: 45px; cursor: text;">
+          {% for tag in tags_list %}
+          {% set t = tag|string %}
+          {% if t.strip() %}
+          <span class="badge bg-primary me-1 mb-1 tag-item">{{ t.strip() }}
+            <button type="button" class="btn-close btn-close-white btn-sm ms-1 remove-tag"></button>
+          </span>
+          {% endif %}
+          {% endfor %}
+          <input type="text" id="tagInput" class="border-0 flex-grow-1" placeholder="Digite e pressione Enter..."
+            style="outline: none;">
+        </div>
+
+        <input type="hidden" name="tags" id="hiddenTags" value="">
+        <small class="text-muted">Ex: API, Autenticação, Usuários</small>
+      </div>
+
+      <!-- Ícone -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Ícone (opcional)</label>
+        <div class="d-flex align-items-center gap-3">
+          <img id="iconPreview" src="{{ icon_url or '/static/img/default-icon.png' }}" alt="Prévia do ícone" width="64"
+            height="64" class="rounded border p-1">
+
+          <div class="d-flex align-items-center gap-2 w-100">
+            <button type="button" id="removeIconBtn" class="btn btn-outline-danger btn-sm py-1 px-2"
+              style="display: {{ 'inline-block' if icon_url else 'none' }};">
+              ❌
+            </button>
+            <input type="file" id="iconInput" name="icon" accept="image/*" class="form-control form-control-sm">
+            <input type="hidden" name="delete_icon" id="deleteIconFlag" value="0">
+          </div>
+        </div>
+        <small class="text-muted d-block mt-1">Formatos suportados: PNG, SVG, JPG.</small>
+      </div>
+
+      <!-- Descrição -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Descrição</label>
+        <textarea name="description" rows="2" maxlength="250" id="description" class="form-control"
+          placeholder="Resumo curto da documentação (máx. 250 caracteres)...">{{ description or '' }}</textarea>
+        <div class="text-end mt-1">
+          <small id="descCounter" class="text-muted">0 / 250</small>
+        </div>
+      </div>
+
+      <!-- Editor Markdown -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Conteúdo (Markdown)</label>
+        <div class="d-flex align-items-center mb-2 gap-2">
+          <input type="file" id="imageInput" accept="image/*" style="display:none;">
+        </div>
+        <textarea id="editor" name="body">{{ body or '' }}</textarea>
+      </div>
+
+      <!-- Ações -->
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary px-4">Salvar</button>
+        {% if mode == 'edit' %}
+        <a href="{{ url_for('view_doc', slug=slug) }}" class="btn btn-outline-secondary">Cancelar</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal de Tabela (versão otimizada) -->
+<div class="modal fade" id="tableModal" tabindex="-1" aria-labelledby="tableModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content shadow-lg border-0 rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-semibold text-primary" id="tableModalLabel">Gerador de Tabelas</h5>
+      </div>
+      <div class="modal-body">
+        <div id="tableControls" class="d-flex flex-wrap justify-content-center align-items-center mb-3 gap-1">
+          <button id="addRowAboveBtn" class="btn btn-outline-success btn-xs" title="Adicionar linha acima">⬆️ Linha acima</button>
+          <button id="addRowBelowBtn" class="btn btn-outline-success btn-xs" title="Adicionar linha abaixo">⬇️ Linha abaixo</button>
+          <button id="removeRowBtn" class="btn btn-outline-danger btn-xs" title="Remover linha">➖ Del. linha</button>
+          <button id="addColLeftBtn" class="btn btn-outline-success btn-xs" title="Adicionar coluna à esquerda">⬅️ Coluna esquerda</button>
+          <button id="addColRightBtn" class="btn btn-outline-success btn-xs" title="Adicionar coluna à direita">➡️ Coluna direita</button>
+          <button id="removeColBtn" class="btn btn-outline-danger btn-xs" title="Remover coluna">➖ Del. coluna</button>
+        </div>
+
+        <div id="tablePreviewContainer" class="table-responsive text-center p-2 bg-light rounded-3 border">
+          <table id="tablePreview" class="table table-bordered align-middle m-0"></table>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="confirmTableBtn">Inserir no Markdown</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dependências -->
+<link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+
+<script>
+  let pendingUploads = [];   // imagens aguardando upload
+  let pendingDeletes = [];   // imagens marcadas para remoção
+
+  document.addEventListener("DOMContentLoaded", () => {
+
+    /* ---------------- TAGS ---------------- */
+    const tagContainer = document.getElementById('tagsContainer');
+    const tagInput = document.getElementById('tagInput');
+    const hiddenTags = document.getElementById('hiddenTags');
+
+    function atualizarTags() {
+      const tags = Array.from(tagContainer.querySelectorAll('.tag-item')).map(tag => tag.firstChild.textContent.trim());
+      hiddenTags.value = tags.join(',');
+    }
+    atualizarTags();
+
+    tagInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && tagInput.value.trim() !== '') {
+        e.preventDefault();
+        const texto = tagInput.value.trim().replace(/,/g, '');
+        if (!texto) return;
+        const span = document.createElement('span');
+        span.className = 'badge bg-primary me-1 mb-1 tag-item';
+        span.innerHTML = `${texto} <button type="button" class="btn-close btn-close-white btn-sm ms-1 remove-tag"></button>`;
+        tagContainer.insertBefore(span, tagInput);
+        tagInput.value = '';
+        atualizarTags();
+      }
+    });
+
+    tagContainer.addEventListener('click', e => {
+      if (e.target.classList.contains('remove-tag')) {
+        e.target.parentElement.remove();
+        atualizarTags();
+      }
+    });
+
+    /* ---------------- ÍCONE ---------------- */
+    const iconPreview = document.getElementById("iconPreview");
+    const iconInput = document.getElementById("iconInput");
+    const removeIconBtn = document.getElementById("removeIconBtn");
+    const deleteIconFlag = document.getElementById("deleteIconFlag");
+
+    let currentIconUrl = "{{ icon_url or '' }}";
+
+    // Exibe ou esconde o botão conforme o estado atual
+    function updateRemoveBtn() {
+      removeIconBtn.style.display =
+        iconPreview.src.includes("default-icon.png") ? "none" : "inline-block";
+    }
+
+    // Quando o usuário seleciona uma nova imagem
+    iconInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // Se já há um ícone salvo, apaga o antigo no servidor
+      if (currentIconUrl && !currentIconUrl.includes("default-icon.png")) {
+        try {
+          await fetch("/delete_image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: currentIconUrl })
+          });
+        } catch (err) {
+          console.warn("Falha ao excluir ícone antigo:", err);
+        }
+      }
+
+      // Mostra preview do novo ícone
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        iconPreview.src = ev.target.result;
+        updateRemoveBtn();
+      };
+      reader.readAsDataURL(file);
+
+      deleteIconFlag.value = "0";
+    });
+
+    // Botão de exclusão/limpeza
+    removeIconBtn.addEventListener("click", async () => {
+      if (!confirm("Deseja realmente remover o ícone atual?")) return;
+
+      // Restaura ícone padrão e limpa input
+      iconPreview.src = "/static/img/default-icon.png";
+      iconInput.value = "";
+      deleteIconFlag.value = "1";
+      updateRemoveBtn();
+
+      // Se havia um ícone anterior salvo, remove também do servidor
+      if (currentIconUrl && !currentIconUrl.includes("default-icon.png")) {
+        try {
+          await fetch(`/docs/{{ slug }}/delete_icon`, { method: "POST" });
+        } catch (err) {
+          console.error("Erro ao remover ícone:", err);
+        }
+      }
+
+      currentIconUrl = "";
+    });
+
+    // Inicializa estado visual
+    updateRemoveBtn();
+
+    /* ---------------- DESCRIÇÃO ---------------- */
+    const desc = document.getElementById('description');
+    const counter = document.getElementById('descCounter');
+    desc.addEventListener('input', () => counter.textContent = `${desc.value.length} / 250`);
+    counter.textContent = `${desc.value.length} / 250`;
+
+    /* ---------------- EasyMDE ---------------- */
+    const mde = new EasyMDE({
+      element: document.getElementById('editor'),
+      spellChecker: false,
+      autosave: { enabled: false },
+      status: false,
+      placeholder: "Escreva aqui em Markdown…",
+      toolbar: [
+        {
+          name: "bold",
+          action: function (editor) {
+            const cm = editor.codemirror;
+            const selection = cm.getSelection();
+
+            if (selection.length > 0) {
+              cm.replaceSelection(`<b>${selection}</b>`);
+            } else {
+              // Se não há seleção, insere as tags e posiciona o cursor entre elas
+              const cursor = cm.getCursor();
+              cm.replaceRange("<b></b>", cursor);
+              cm.setCursor({ line: cursor.line, ch: cursor.ch + 3 }); // move o cursor entre as tags
+            }
+
+            cm.focus();
+          },
+          className: "fa fa-bold",
+          title: "Sublinhar (<b>texto</b>)"
+        },
+        "italic",
+        {
+          name: "underline",
+          action: function (editor) {
+            const cm = editor.codemirror;
+            const selection = cm.getSelection();
+
+            if (selection.length > 0) {
+              // Se há texto selecionado, envolve com <u>...</u>
+              cm.replaceSelection(`<u>${selection}</u>`);
+            } else {
+              // Se não há seleção, insere as tags e posiciona o cursor entre elas
+              const cursor = cm.getCursor();
+              cm.replaceRange("<u></u>", cursor);
+              cm.setCursor({ line: cursor.line, ch: cursor.ch + 3 }); // move o cursor entre as tags
+            }
+
+            cm.focus();
+          },
+          className: "fa fa-underline",
+          title: "Sublinhar (<u>texto</u>)"
+        },
+        {
+          name: "strikethrough",
+          action: function (editor) {
+            const cm = editor.codemirror;
+            const selection = cm.getSelection();
+
+            if (selection.length > 0) {
+              // Se há seleção, aplica riscado ao texto selecionado
+              cm.replaceSelection(`<del>${selection}</del>`);
+            } else {
+              // Se não há seleção, insere as tags e posiciona o cursor entre elas
+              const cursor = cm.getCursor();
+              cm.replaceRange("<del></del>", cursor);
+              cm.setCursor({ line: cursor.line, ch: cursor.ch + 3 }); // move o cursor entre as tags
+            }
+
+            cm.focus();
+          },
+          className: "fa fa-strikethrough",
+          title: "Riscado (~~texto~~)"
+        },
+        {
+          name: "link",
+          action: function insertLink(editor) {
+            const cm = editor.codemirror;
+            const selection = cm.getSelection() || "";
+
+            const linkText = selection || prompt("Texto do link:", "");
+            if (linkText === null) return; // cancelou
+
+            const url = prompt("URL do link (ex: https://...):", "");
+            if (url === null || !url.trim()) return;
+
+            const markdownLink = `[${linkText}](${url.trim()})`;
+            cm.replaceSelection(markdownLink);
+            cm.focus();
+          },
+          className: "fa fa-link",
+          title: "Inserir link"
+        },
+        "|",
+        {
+          name: "inline-code",
+          action: (editor) => wrapSelection(editor, "`"),
+          className: "fa fa-code",
+          title: "Código inline (`texto`)"
+        },
+        {
+          name: "code-block",
+          action: (editor) => wrapBlock(editor, "```"),
+          className: "fa fa-file-code-o",
+          title: "Bloco de código (```)"
+        },
+        "|",
+        "heading", "quote", "unordered-list", "ordered-list",
+        "|",
+        {
+          name: "table",
+          action: () => openTableBuilder(false),
+          className: "fa fa-table",
+          title: "Inserir nova tabela"
+        },
+        "|",
+        {
+          name: "edit-table",
+          action: () => openTableBuilder(true),
+          className: "fa fa-edit",
+          title: "Editar tabela existente"
+        },
+        "|",
+        {
+          name: "image",
+          action: function queueImageUpload(editor) {
+            const input = document.getElementById("imageInput");
+            input.click();
+
+            input.onchange = function () {
+              const file = input.files[0];
+              if (!file) return;
+
+              const cm = editor.codemirror;
+              const pos = cm.getCursor();
+
+              // Gera um identificador temporário
+              const placeholder = `TEMP_IMG_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+              // Quebra linha e insere markdown temporário
+              const markdown = `![${file.name}](${placeholder})\n`;
+              cm.replaceRange("\n" + markdown + "\n", pos);
+
+              // Guarda a imagem para upload posterior
+              pendingUploads.push({
+                file,
+                slug: "{{ slug or '' }}",
+                placeholder
+              });
+
+              input.value = "";
+            };
+          },
+          className: "fa fa-picture-o",
+          title: "Inserir imagem (enviada ao salvar)"
+        },
+        {
+          name: "delete-image",
+          action: function markImageForDeletion(editor) {
+            const cm = editor.codemirror;
+            const cursor = cm.getCursor();
+            const line = cm.getLine(cursor.line);
+            const match = line.match(/!\[.*?\]\((.*?)\)/);
+
+            if (!match) {
+              alert("Nenhuma imagem detectada nesta linha.");
+              return;
+            }
+
+            const imageUrl = match[1];
+            if (confirm("Deseja realmente remover esta imagem?")) {
+              if (!imageUrl.startsWith("TEMP_IMG_")) {
+                pendingDeletes.push(imageUrl);
+              } else {
+                // Se era uma imagem pendente de upload, remova da fila
+                pendingUploads = pendingUploads.filter(u => u.placeholder !== imageUrl);
+              }
+              cm.replaceRange("", { line: cursor.line, ch: 0 }, { line: cursor.line, ch: line.length });
+            }
+          },
+          className: "fa fa-trash",
+          title: "Remover imagem (ao salvar)"
+        }
+      ],
+      toolbarGuideIcon: true
+    });
+
+    // helpers para sublinhar / inline code / bloco de código
+    function wrapSelection(editor, mark) {
+      const cm = editor.codemirror;
+      const selection = cm.getSelection();
+      if (selection) {
+        cm.replaceSelection(mark + selection + mark);
+      } else {
+        const cursor = cm.getCursor();
+        cm.replaceRange(mark + mark, cursor);
+        cm.setCursor({ line: cursor.line, ch: cursor.ch + mark.length });
+      }
+      cm.focus();
+    }
+
+    function wrapBlock(editor, fence) {
+      const cm = editor.codemirror;
+      const selection = cm.getSelection() || "";
+      const text = selection ? selection : "";
+      const prefix = fence + "\n";
+      const suffix = "\n" + fence;
+      if (selection) {
+        cm.replaceSelection(prefix + text + suffix);
+      } else {
+        const cursor = cm.getCursor();
+        cm.replaceRange(prefix + suffix, cursor);
+        cm.setCursor({ line: cursor.line + 1, ch: 0 });
+      }
+      cm.focus();
+    }
+
+    /* ---------------- GERADOR DE TABELAS ---------------- */
+    let tableRows = 3, tableCols = 3;
+    const tablePreview = document.getElementById("tablePreview");
+    const tableModal = new bootstrap.Modal(document.getElementById("tableModal"));
+
+    function renderTableForm(data = null) {
+      // Captura dados e dimensões anteriores
+      const oldData = data || getTableData();
+      const frag = document.createDocumentFragment();
+      const thead = document.createElement("thead");
+      const tbody = document.createElement("tbody");
+
+      // --- Cabeçalho ---
+      const headerRow = document.createElement("tr");
+      for (let c = 0; c < tableCols; c++) {
+        const th = document.createElement("th");
+        const textarea = document.createElement("textarea");
+        textarea.className = "form-control form-control-sm";
+        textarea.rows = 1;
+        textarea.style.resize = "none";
+        textarea.style.overflow = "hidden";
+        textarea.style.whiteSpace = "pre-wrap";
+        textarea.style.wordBreak = "break-word";
+        textarea.placeholder = `Cabeçalho ${c + 1}`;
+
+        // Restaura valor e tamanho anterior, se existir
+        if (oldData[0]?.[c]) {
+          textarea.value = oldData[0][c].value || "";
+          if (oldData[0][c].width) textarea.style.width = oldData[0][c].width;
+          if (oldData[0][c].height) textarea.style.height = oldData[0][c].height;
+        }
+
+        textarea.addEventListener("focus", highlightCell);
+        th.appendChild(textarea);
+        headerRow.appendChild(th);
+      }
+      thead.appendChild(headerRow);
+
+      // --- Corpo ---
+      for (let r = 1; r < tableRows; r++) {
+        const tr = document.createElement("tr");
+        for (let c = 0; c < tableCols; c++) {
+          const td = document.createElement("td");
+          const textarea = document.createElement("textarea");
+          textarea.className = "form-control form-control-sm";
+          textarea.rows = 1;
+          textarea.style.resize = "none";
+          textarea.style.overflow = "hidden";
+          textarea.style.whiteSpace = "pre-wrap";
+          textarea.style.wordBreak = "break-word";
+          textarea.placeholder = `L${r}, C${c + 1}`;
+
+          // Restaura valor e dimensões anteriores, se existir
+          if (oldData[r]?.[c]) {
+            textarea.value = oldData[r][c].value || "";
+            if (oldData[r][c].width) textarea.style.width = oldData[r][c].width;
+            if (oldData[r][c].height) textarea.style.height = oldData[r][c].height;
+          }
+
+          textarea.addEventListener("focus", highlightCell);
+          td.appendChild(textarea);
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+
+      frag.append(thead, tbody);
+      tablePreview.replaceChildren(frag);
+    }
+
+    // --- Permitir colar imagens com Ctrl+V ---
+    mde.codemirror.on("paste", async function (cm, event) {
+      const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+      for (const item of items) {
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (!file || !file.type.startsWith("image/")) continue;
+
+          // Insere placeholder temporário
+          const placeholder = `TEMP_IMG_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+          const pos = cm.getCursor();
+          cm.replaceRange(`\n![${file.name}](${placeholder})\n`, pos);
+
+          // Guarda na fila para upload posterior
+          pendingUploads.push({
+            file,
+            slug: "{{ slug or '' }}",
+            placeholder
+          });
+
+          event.preventDefault();
+          break;
+        }
+      }
+    });
+
+
+    mde.codemirror.on("beforeChange", (cm, change) => {
+      try {
+        const { from, to, origin, text } = change;
+
+        // Impede qualquer alteração (inclusive digitação) em linhas que contenham imagens
+        for (let lineNum = from.line; lineNum <= to.line; lineNum++) {
+          const lineText = cm.getLine(lineNum);
+          if (!lineText) continue;
+
+          // Detecta imagem Markdown
+          const isImageLine = /!\[.*?\]\(.*?\)/.test(lineText);
+          if (isImageLine) {
+            // Permite apenas se a ação for navegação, não edição
+            if (origin && origin.startsWith("+")) {
+              alert("🚫 Linhas com imagens não podem ser editadas. Use o botão de lixeira para remover.");
+              change.cancel();
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao bloquear edição em linhas de imagem:", err);
+      }
+    });
+
+    function highlightCell(e) {
+      tablePreview.querySelectorAll("textarea").forEach(t => t.classList.remove("active-cell"));
+      e.target.classList.add("active-cell");
+    }
+
+    function getActiveCellPosition() {
+      const active = tablePreview.querySelector(".active-cell");
+      if (!active) return null;
+
+      const rows = Array.from(tablePreview.querySelectorAll("tr"));
+      for (let r = 0; r < rows.length; r++) {
+        const cells = Array.from(rows[r].querySelectorAll("textarea"));
+        const c = cells.indexOf(active);
+        if (c !== -1) return { rowIndex: r, colIndex: c };
+      }
+      return null;
+    }
+
+    function insertRowAt(index) {
+      const data = getTableData();
+      const numCols = data[0]?.length || tableCols;
+      const newRow = Array(numCols).fill({ value: "", width: "auto", height: "auto" });
+      data.splice(index, 0, newRow);
+      tableRows = data.length;
+      renderTableForm(data);
+    }
+
+    function insertColAt(index) {
+      const data = getTableData();
+      data.forEach(row => {
+        row.splice(index, 0, { value: "", width: "auto", height: "auto" });
+      });
+      tableCols = data[0].length;
+      renderTableForm(data);
+    }
+
+    function getTableData() {
+      return Array.from(tablePreview.querySelectorAll("tr")).map(tr =>
+        Array.from(tr.querySelectorAll("textarea")).map(t => ({
+          value: t.value,
+          width: t.style.width,
+          height: t.style.height
+        }))
+      );
+    }
+
+    document.getElementById("addRowAboveBtn").onclick = e => {
+      e.preventDefault();
+      const pos = getActiveCellPosition();
+      if (!pos) return alert("Selecione uma célula primeiro.");
+      insertRowAt(pos.rowIndex);
+    };
+
+    document.getElementById("addRowBelowBtn").onclick = e => {
+      e.preventDefault();
+      const pos = getActiveCellPosition();
+      if (!pos) return alert("Selecione uma célula primeiro.");
+      insertRowAt(pos.rowIndex + 1);
+    };
+
+    document.getElementById("addColLeftBtn").onclick = e => {
+      e.preventDefault();
+      const pos = getActiveCellPosition();
+      if (!pos) return alert("Selecione uma célula primeiro.");
+      insertColAt(pos.colIndex);
+    };
+
+    document.getElementById("addColRightBtn").onclick = e => {
+      e.preventDefault();
+      const pos = getActiveCellPosition();
+      if (!pos) return alert("Selecione uma célula primeiro.");
+      insertColAt(pos.colIndex + 1);
+    };
+
+    document.getElementById("removeRowBtn").onclick = e => { e.preventDefault(); if (tableRows > 2) tableRows--; renderTableForm(); };
+    // Remover linha selecionada
+    document.getElementById("removeRowBtn").onclick = e => {
+      e.preventDefault();
+      const pos = getActiveCellPosition();
+      if (!pos) return alert("Selecione uma célula primeiro.");
+
+      const data = getTableData();
+      if (data.length <= 2) return alert("A tabela deve ter pelo menos 1 linha de dados.");
+
+      data.splice(pos.rowIndex, 1);
+      tableRows = data.length;
+      renderTableForm(data);
+    };
+
+    // Remover coluna selecionada
+    document.getElementById("removeColBtn").onclick = e => {
+      e.preventDefault();
+      const pos = getActiveCellPosition();
+      if (!pos) return alert("Selecione uma célula primeiro.");
+
+      const data = getTableData();
+      if (data[0].length <= 1) return alert("A tabela deve ter pelo menos 1 coluna.");
+
+      data.forEach(row => row.splice(pos.colIndex, 1));
+      tableCols = data[0].length;
+      renderTableForm(data);
+    };
+
+    function buildMarkdownTable() {
+      const rows = getTableData();
+      if (!rows.length) return "";
+
+      let md = "<!-- TABELA:INICIO -->\n";
+
+      // Cabeçalhos
+      const headers = rows[0].map(h => (h.value || "Cabeçalho"));
+      md += "| " + headers.join(" | ") + " |\n";
+      md += "|" + headers.map(() => "---").join("|") + "|\n";
+
+      // Linhas de dados
+      for (let i = 1; i < rows.length; i++) {
+        md += "| " + rows[i].map(v => (v.value || " ")).join(" | ") + " |\n";
+      }
+
+      md += "<!-- TABELA:FIM -->\n";
+      return md;
+    }
+
+
+    // Ao confirmar inserção/edição
+    document.getElementById("confirmTableBtn").onclick = e => {
+      e.preventDefault();
+      const md = buildMarkdownTable();
+      const cm = mde.codemirror;
+      const content = cm.getValue();
+      const regex = /<!--\s*TABELA:INICIO\s*-->([\s\S]*?)<!--\s*TABELA:FIM\s*-->/;
+
+      const isEditing = tableModal.getAttribute("data-editing") === "true";
+
+      if (isEditing && regex.test(content)) {
+        // Editar tabela existente
+        const updated = content.replace(regex, md);
+        cm.setValue(updated);
+      } else {
+        // Criar nova tabela
+        cm.replaceSelection(md);
+      }
+
+      // Limpa quaisquer campos residuais do modal anterior
+      document.querySelector("#tablePreview").innerHTML = "";
+      document.querySelector("#tableModal").removeAttribute("data-editing");
+      document.querySelector("#tableModal").removeAttribute("data-start");
+      document.querySelector("#tableModal").removeAttribute("data-end");
+
+      tableModal.hide();
+    };
+
+    // Conversor de Markdown em matriz
+    function parseMarkdownTable(markdown) {
+      const lines = markdown.trim().split("\n")
+        .filter(line => line.trim() && !/^(\| *-+ *)+\|?$/.test(line));
+
+      return lines.map(line =>
+        line.replace(/^\||\|$/g, "")
+          .split("|")
+          .map(cell => cell.trim())
+      );
+    }
+
+    // --- Abre o construtor de tabela ---
+    function openTableBuilder(isEdit = false) {
+      const cm = mde.codemirror;
+      const content = cm.getValue();
+      const modalEl = document.getElementById("tableModal");
+
+      if (isEdit) {
+        const regex = /<!--\s*TABELA:INICIO\s*-->([\s\S]*?)<!--\s*TABELA:FIM\s*-->/g;
+        const cursor = cm.indexFromPos(cm.getCursor());
+        let matchFound = null;
+
+        // Encontrar tabela sob o cursor
+        for (const match of content.matchAll(regex)) {
+          const start = match.index;
+          const end = start + match[0].length;
+          if (cursor >= start && cursor <= end) {
+            matchFound = match;
+            break;
+          }
+        }
+
+        if (matchFound) {
+          const existingTable = matchFound[1].trim();
+          const parsed = parseMarkdownTable(existingTable);
+          if (parsed.length) {
+            tableRows = parsed.length;
+            tableCols = parsed[0].length;
+            renderTableForm(parsed.map(row =>
+              row.map(v => ({ value: v, width: "auto", height: "auto" }))
+            ));
+            modalEl.setAttribute("data-editing", "true");
+            modalEl.setAttribute("data-start", matchFound.index);
+            modalEl.setAttribute("data-end", matchFound.index + matchFound[0].length);
+            tableModal.show();
+            return;
+          }
+        }
+
+        alert("Nenhuma tabela encontrada sob o cursor.");
+        return;
+      }
+
+      // Nova tabela
+      tableRows = 3;
+      tableCols = 3;
+
+      // Limpa quaisquer campos residuais do modal anterior
+      document.querySelector("#tablePreview").innerHTML = "";
+      document.querySelector("#tableModal").removeAttribute("data-editing");
+      document.querySelector("#tableModal").removeAttribute("data-start");
+      document.querySelector("#tableModal").removeAttribute("data-end");
+
+      renderTableForm();
+      modalEl.setAttribute("data-editing", "false");
+      tableModal.show();
+    }
+
+    // --- Botão confirmar ---
+    document.getElementById("confirmTableBtn").onclick = e => {
+      e.preventDefault();
+      const md = buildMarkdownTable();
+      const cm = mde.codemirror;
+      const modalEl = document.getElementById("tableModal");
+      const isEditing = modalEl.getAttribute("data-editing") === "true";
+      const content = cm.getValue();
+
+      if (isEditing) {
+        const start = parseInt(modalEl.getAttribute("data-start"), 10);
+        const end = parseInt(modalEl.getAttribute("data-end"), 10);
+
+        if (!isNaN(start) && !isNaN(end)) {
+          const before = content.slice(0, start);
+          const after = content.slice(end);
+          cm.setValue(before + md + after);
+        }
+      } else {
+        cm.replaceSelection(md);
+      }
+
+      modalEl.removeAttribute("data-editing");
+      modalEl.removeAttribute("data-start");
+      modalEl.removeAttribute("data-end");
+      tableModal.hide();
+    };
+
+
+    // --- Gatilho do botão Salvar (AGORA DENTRO DO DOMContentLoaded) ---
+    document.querySelector("form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const cm = mde.codemirror;
+      let content = cm.getValue();
+
+      // Enviar imagens pendentes
+      for (const item of pendingUploads) {
+        const formData = new FormData();
+        formData.append("file", item.file);
+        formData.append("slug", item.slug);
+        formData.append("title", document.querySelector('input[name="title"]').value);
+
+        try {
+          const response = await fetch("/upload", { method: "POST", body: formData });
+          const data = await response.json();
+          if (data.url) {
+            content = content.replaceAll(item.placeholder, data.url);
+          }
+        } catch (err) {
+          console.error("Erro ao enviar imagem:", err);
+        }
+      }
+
+      // Excluir imagens pendentes
+      for (const url of pendingDeletes) {
+        try {
+          await fetch("/delete_image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url })
+          });
+        } catch (err) {
+          console.error("Erro ao excluir imagem:", err);
+        }
+      }
+
+      // Limpar filas
+      pendingUploads = [];
+      pendingDeletes = [];
+
+      // Atualizar conteúdo e enviar form real
+      cm.setValue(content);
+      e.target.submit();
+    });
+
+    document.addEventListener("input", (e) => {
+      if (e.target.closest("#tablePreview") && e.target.tagName === "TEXTAREA") {
+        const el = e.target;
+        el.style.height = "auto";
+        el.style.height = Math.min(el.scrollHeight, 120) + "px";
+
+        const temp = document.createElement("span");
+        temp.style.visibility = "hidden";
+        temp.style.whiteSpace = "pre";
+        temp.style.font = getComputedStyle(el).font;
+        temp.textContent = el.value || el.placeholder || "";
+        document.body.appendChild(temp);
+
+        const newWidth = Math.min(Math.max(temp.offsetWidth + 20, 80), 250);
+        el.style.width = newWidth + "px";
+
+        document.body.removeChild(temp);
+      }
+    });
+
+  });
+
+</script>
+
+<style>
+/* ============================
+   ESTILO MODERNO E SUAVE (TEMA CLARO)
+   ============================ */
+
+/* ---- CARD BODY ---- */
+.card-body {
+  background: #ffffff !important;
+  color: #333 !important;
+  border-top: 1px solid #f2f2f2 !important;
+  border-radius: 0 0 0.8rem 0.8rem !important;
+  padding: 1rem 1.25rem !important;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.25s ease-in-out;
+}
+
+/* ---- HOVER SUAVE ---- */
+.card:hover .card-body {
+  background: #fcfcfc !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+/* ============================
+   FORM CONTROL — TEMA CLARO E SUAVE
+   ============================ */
+
+.form-control {
+  flex-grow: 1; /* Permite que o input ocupe todo o espaço disponível */
+  background: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+  color: #333 !important;
+  border-radius: 0.6rem !important;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.9rem !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s ease-in-out;
+}
+
+/* Placeholder com cor suave */
+.form-control::placeholder {
+  color: #999 !important;
+  opacity: 1;
+}
+
+/* Foco com realce azul elegante */
+.form-control:focus {
+  border-color: #4a90e2 !important;
+  box-shadow: 0 0 0 0.25rem rgba(74, 144, 226, 0.25) !important;
+  outline: none !important;
+}
+
+/* Estado desabilitado — aparência neutra */
+.form-control:disabled,
+.form-control[readonly] {
+  background-color: #f8f9fa !important;
+  color: #777 !important;
+  cursor: not-allowed;
+}
+
+/* Hover leve */
+.form-control:hover:not(:disabled):not(:focus) {
+  border-color: #b8c3cc !important;
+  background: #fcfcfc !important;
+}
+
+/* Versão menor */
+.form-control-sm {
+  padding: 0.4rem 0.7rem !important;
+  font-size: 0.85rem;
+  border-radius: 0.5rem !important;
+}
+
+/* ---- INPUT GROUP (busca ou formulário) ---- */
+.input-group {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* ---- CONTEÚDO INTERNO ---- */
+.card-body p {
+  color: #555;
+  margin-bottom: 0.75rem;
+}
+
+.card-body h1,
+.card-body h2,
+.card-body h3,
+.card-body h4,
+.card-body h5,
+.card-body h6 {
+  color: #222 !important;
+  font-weight: 600;
+  margin-top: 0.8rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+/* ---- LINKS NO CARD ---- */
+.card-body a {
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+.card-body a:hover {
+  text-decoration: none;
+}
+
+/* ---- CARD GERAL ---- */
+.card {
+  background-color: #ffffff !important;
+  border: 1px solid #eaeaea !important;
+  border-radius: 0.8rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.25s ease-in-out;
+}
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+/* ======= ROLAGEM VERTICAL NO EDITOR ======= */
+.EasyMDEContainer {
+  max-height: 500px;
+  overflow-y: auto;
+  border: 1px solid #eaeaea;
+  border-radius: 0.8rem;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.25s ease-in-out;
+}
+.EasyMDEContainer:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+/* Toolbar fixa */
+.EasyMDEContainer .editor-toolbar {
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  border-bottom: 1px solid #eee;
+  z-index: 2;
+  border-radius: 0.8rem 0.8rem 0 0;
+}
+
+/* Botões da toolbar */
+.EasyMDEContainer .editor-toolbar button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 30px !important;
+  height: 30px !important;
+  margin: 2px !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  border: none !important;
+  border-radius: 0.4rem !important;
+  background: rgba(245, 247, 250, 0.9) !important;
+  transition: all 0.25s ease-in-out;
+  color: #444 !important;
+}
+.EasyMDEContainer .editor-toolbar button:hover {
+  background: linear-gradient(135deg, #eef4ff, #e3e9ff) !important;
+  color: #2c62e0 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Ícones */
+.EasyMDEContainer .editor-toolbar button i,
+.EasyMDEContainer .editor-toolbar button::before {
+  font-size: 13px !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+}
+.EasyMDEContainer .editor-toolbar button.fa-table::before,
+.EasyMDEContainer .editor-toolbar button.fa-edit::before {
+  font-size: 13px !important;
+  transform: scale(0.9);
+}
+
+/* ======= MODAL DE TABELAS ======= */
+#tableModal .btn-group .btn {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.8rem;
+  line-height: 1.3;
+  border-radius: 0.6rem;
+  border: none !important;
+  background: #ffffff !important;
+  color: #333 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  transition: all 0.25s ease;
+}
+#tableModal .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Outline buttons */
+#tableModal .btn-outline-success {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  color: #34a853 !important;
+  border: 1px solid rgba(52, 168, 83, 0.25) !important;
+  backdrop-filter: blur(4px);
+}
+#tableModal .btn-outline-success:hover {
+  background: linear-gradient(135deg, #58c98a, #34a853) !important;
+  color: #fff !important;
+}
+#tableModal .btn-outline-danger {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  color: #dc3545 !important;
+  border: 1px solid rgba(220, 53, 69, 0.25) !important;
+  backdrop-filter: blur(4px);
+}
+#tableModal .btn-outline-danger:hover {
+  background: linear-gradient(135deg, #f56a6a, #dc3545) !important;
+  color: #fff !important;
+}
+
+/* === BOTÕES COMPACTOS EM LINHA === */
+#tableControls {
+  background-color: #f8f9fb;
+  border-radius: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #e2e6ea;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+#tableControls .btn-xs {
+  font-size: 0.8rem !important;
+  padding: 0.3rem 0.55rem !important;
+  line-height: 1 !important;
+  border-radius: 0.4rem !important;
+  min-width: 36px;
+  min-height: 30px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: all 0.2s ease-in-out;
+}
+
+#tableControls .btn-xs:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+}
+
+#tableControls .btn-outline-success,
+#tableControls .btn-outline-danger {
+  border-width: 1px !important;
+}
+
+/* Botão principal */
+#confirmTableBtn {
+  font-size: 0.95rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 0.6rem;
+  font-weight: 500;
+  color: #fff !important;
+  background: linear-gradient(135deg, #4a90e2, #357ae8) !important;
+  border: none !important;
+  transition: all 0.25s ease;
+}
+#confirmTableBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  filter: brightness(1.05);
+}
+#tableModal .btn:active {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ======= AJUSTES GERAIS ======= */
+/* ======= MELHORIAS VISUAIS NA JANELA DE TABELAS ======= */
+
+#tablePreviewContainer {
+  max-height: 360px;
+  min-width: 100px;
+  overflow-y: auto;
+  border: 1px solid #e2e6ea;
+  background: #fafbfc;
+  border-radius: 0.8rem;
+  padding: 0.5rem;
+}
+
+/* Células da tabela */
+#tablePreview th,
+#tablePreview td {
+  vertical-align: middle !important;
+  text-align: center !important;
+  border: 1px solid #dee2e6 !important;
+  background-color: #fff;
+}
+
+/* Textareas internas */
+#tablePreview textarea.form-control-sm {
+  width: 100%;
+  min-width: 80px !important;
+  max-width: 250px;
+  min-height: 32px;
+  resize: none;
+  overflow: hidden;
+  text-align: center;
+  border-radius: 0.5rem;
+  border: 1px solid #d0d7de;
+  background-color: #fefefe;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+  font-size: 0.85rem;
+}
+
+/* Célula ativa */
+#tablePreview .active-cell {
+  outline: 2px solid #4a90e2 !important;
+  background-color: #eef5ff !important;
+  z-index: 1;
+  position: relative;
+}
+
+/* Hover leve */
+#tablePreview textarea.form-control-sm:hover:not(.active-cell) {
+  border-color: #9db8ff;
+  background-color: #f9fbff;
+}
+
+/* Ajuste suave do tamanho */
+#tablePreview textarea.form-control-sm:focus {
+  border-color: #4a90e2 !important;
+  box-shadow: 0 0 0 0.2rem rgba(74,144,226,0.25) !important;
+}
+
+/* Modal geral */
+#tableModal .modal-content {
+  border-radius: 1rem;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+#tableModal .modal-header h5 {
+  font-weight: 600;
+  color: #2c62e0;
+}
+
+#tablePreview input.form-control-sm {
+  padding: 4px 6px;
+  border-radius: 0.4rem;
+  border: 1px solid #d0d7de;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) inset;
+  transition: all 0.2s ease;
+}
+#tableModal .modal-footer .btn {
+  min-width: auto;
+}
+
+.active-cell {
+  outline: 2px solid #4a90e2 !important;
+  background-color: #eef4ff;
+}
+
+/* ======= TRANSIÇÕES ======= */
+.EasyMDEContainer,
+.editor-toolbar button,
+#tableModal .btn,
+#confirmTableBtn,
+input.form-control-sm,
+.card-actions .btn,
+.modal-footer .btn {
+  transition: all 0.25s ease-in-out;
+}
+
+/* ==========================================
+   🔹 INPUT TAG (border-0 flex-grow-1)
+   ========================================== */
+#tagInput.border-0.flex-grow-1 {
+  background-color: #f9fafb !important; /* Fundo claro e neutro */
+  color: #333 !important;
+  border-radius: 0.4rem !important;
+  padding: 0.4rem 0.6rem !important;
+  transition: all 0.25s ease-in-out;
+}
+
+#tagInput.border-0.flex-grow-1::placeholder {
+  color: #999 !important;
+  opacity: 1;
+}
+
+#tagInput.border-0.flex-grow-1:focus {
+  background-color: #ffffff !important;
+  box-shadow: 0 0 0 0.25rem rgba(74, 144, 226, 0.15) !important;
+  outline: none !important;
+}
+
+/* Quando o usuário passa o mouse sobre o campo */
+#tagInput.border-0.flex-grow-1:hover:not(:focus) {
+  background-color: #fdfdfd !important;
+}
+
+/* Mantém o visual coeso dentro do container de tags */
+#tagsContainer {
+  background: #ffffff !important;
+  border: 1px solid #d0d7de !important;
+  border-radius: 0.6rem !important;
+  padding: 0.35rem 0.5rem !important;
+  transition: all 0.25s ease-in-out;
+}
+#tagsContainer:focus-within {
+  border-color: #4a90e2 !important;
+  box-shadow: 0 0 0 0.25rem rgba(74, 144, 226, 0.2) !important;
+}
+
+/* ==========================================
+   🔹 ESTILO GLOBAL DE BOTÕES MODERNOS
+   ========================================== */
+.btn {
+  font-weight: 500;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 0.95rem;
+  border: none !important;
+  border-radius: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  color: #fff !important;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  letter-spacing: 0.02em;
+}
+
+/* Hover e foco */
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  filter: brightness(1.05);
+}
+.btn:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 0.25rem rgba(90, 150, 255, 0.2) !important;
+}
+
+/* Cores */
+.btn-primary { background: linear-gradient(135deg, #4a90e2, #357ae8) !important; }
+.btn-success { background: linear-gradient(135deg, #58c98a, #34a853) !important; }
+.btn-warning { background: linear-gradient(135deg, #f9cf58, #f7b500) !important; color: #fff !important; }
+.btn-danger  { background: linear-gradient(135deg, #f56a6a, #dc3545) !important; }
+.btn-secondary { background: linear-gradient(135deg, #adb5bd, #868e96) !important; }
+.btn-info { background: linear-gradient(135deg, #66d1ff, #0dcaf0) !important; }
+
+/* Outline */
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-warning,
+.btn-outline-danger,
+.btn-outline-secondary,
+.btn-outline-info {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  color: #333 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(4px);
+}
+
+.btn-outline-primary:hover { background: linear-gradient(135deg, #4a90e2, #357ae8) !important; color: #fff !important; }
+.btn-outline-success:hover { background: linear-gradient(135deg, #58c98a, #34a853) !important; color: #fff !important; }
+.btn-outline-warning:hover { background: linear-gradient(135deg, #f9cf58, #f7b500) !important; color: #fff !important; }
+.btn-outline-danger:hover  { background: linear-gradient(135deg, #f56a6a, #dc3545) !important; color: #fff !important; }
+.btn-outline-secondary:hover { background: linear-gradient(135deg, #adb5bd, #868e96) !important; color: #fff !important; }
+.btn-outline-info:hover    { background: linear-gradient(135deg, #66d1ff, #0dcaf0) !important; color: #fff !important; }
+
+</style>
+
+
+{% endblock %}

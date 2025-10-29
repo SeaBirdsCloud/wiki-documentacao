@@ -1,0 +1,317 @@
+<!--
+##############################################################
+# Desenvolvido por: Lucas Perdigão de Oliveira
+# Data: 29-10-2025
+#
+# Descrição:
+# Wiki para criação e gerenciamento de documentações, com suporte à:
+#  - Adição e gerenciamento de usuários e suas hierarquias
+#  - Criação e organização de hierarquias de documentações
+#  - Adição, edição e exclusão de documentações
+#  - Retenção automática de documentações excluídas por até 7 dias
+#
+##############################################################
+-->
+
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container py-4 fade-in">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">🗑️ Lixeira</h2>
+    <a href="{{ url_for('docs') }}" class="btn btn-outline-secondary btn-sm">← Voltar</a>
+  </div>
+
+  {% if items %}
+  <div>
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Data de exclusão</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td  data-label="Nome da documentação" class="fw-semibold text-break">{{ item.name }}</td>
+          <td  data-label="Deletado em">{{ item.deleted_at }}</td>
+          <td  data-label="Ações">
+            <form method="post" action="{{ url_for('restore_doc') }}" style="display:inline;">
+              <input type="hidden" name="name" value="{{ item.name }}">
+              <button class="btn btn-sm btn-success" onclick="return confirm('Restaurar esta documentação?')">Restaurar</button>
+            </form>
+
+            <form method="post" action="{{ url_for('purge_doc') }}" style="display:inline;">
+              <input type="hidden" name="name" value="{{ item.name }}">
+              <button class="btn btn-sm btn-danger" onclick="return confirm('Excluir permanentemente?')">Excluir</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="alert alert-info mt-4">
+    Nenhum item na lixeira.
+  </div>
+  {% endif %}
+
+</div>
+
+<style>
+/* ======== ANIMAÇÃO ======== */
+.fade-in {
+  animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity, transform;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* ---- TABELA MODERNA ---- */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  animation: fadeInUp 0.6s ease;
+}
+
+.table thead {
+  background: linear-gradient(180deg, #eef2f7, #e3e9f0);
+  border-bottom: 2px solid #d9e1ec;
+}
+
+.table th {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  color: #334155;
+  padding: 1rem;
+  text-align: left;
+}
+
+.table tbody tr {
+  transition: background 0.25s ease, transform 0.2s ease;
+}
+
+.table td {
+  padding: 0.9rem 1rem;
+  font-size: 0.95rem;
+  color: #475569;
+  border-top: 1px solid #f1f3f5;
+  background: #fff;
+}
+
+/* Alterna levemente as linhas para melhor leitura */
+.table tbody tr:nth-child(even) td {
+  background: #fafbfc;
+}
+
+/* Efeito hover delicado */
+.table tbody tr:hover td {
+  background: #f0f7ff;
+  transform: translateY(-1px);
+}
+
+/* Primeira coluna mais destacada */
+.table tbody td:first-child {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+/* ======== BOTÕES ======== */
+.btn {
+  margin: 3px 0;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-weight: 500;
+  font-size: 0.95rem;
+  border: none !important;
+  border-radius: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  color: #fff !important;
+  transition: all 0.25s ease-in-out;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.2);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  border-radius: inherit;
+}
+
+.btn:hover::after {
+  opacity: 1;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+  filter: brightness(1.06);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  filter: brightness(0.95);
+}
+
+/* ======== CORES SUAVES E GRADIENTES ======== */
+.btn-primary {
+  background: linear-gradient(135deg, #4a90e2, #357ae8) !important;
+}
+.btn-success {
+  background: linear-gradient(135deg, #58c98a, #34a853) !important;
+}
+.btn-warning {
+  background: linear-gradient(135deg, #f9cf58, #f7b500) !important;
+}
+.btn-danger {
+  background: linear-gradient(135deg, #f56a6a, #dc3545) !important;
+}
+.btn-secondary {
+  background: linear-gradient(135deg, #adb5bd, #868e96) !important;
+}
+.btn-info {
+  background: linear-gradient(135deg, #66d1ff, #0dcaf0) !important;
+}
+
+/* ======== FOCO E ACESSIBILIDADE ======== */
+.btn:focus-visible {
+  outline: 2px solid rgba(74, 144, 226, 0.4);
+  outline-offset: 3px;
+}
+
+/* ======== OUTLINE (modo translúcido moderno) ======== */
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-warning,
+.btn-outline-danger,
+.btn-outline-secondary,
+.btn-outline-info {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  color: #333 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(6px);
+  transition: all 0.25s ease-in-out;
+}
+
+.btn-outline-primary:hover {
+  background: linear-gradient(135deg, #4a90e2, #357ae8) !important;
+  color: #fff !important;
+}
+.btn-outline-success:hover {
+  background: linear-gradient(135deg, #58c98a, #34a853) !important;
+  color: #fff !important;
+}
+.btn-outline-warning:hover {
+  background: linear-gradient(135deg, #f9cf58, #f7b500) !important;
+  color: #fff !important;
+}
+.btn-outline-danger:hover {
+  background: linear-gradient(135deg, #f56a6a, #dc3545) !important;
+  color: #fff !important;
+}
+.btn-outline-secondary:hover {
+  background: linear-gradient(135deg, #adb5bd, #868e96) !important;
+  color: #fff !important;
+}
+
+/* ======== TRANSIÇÕES SUAVES GERAIS ======== */
+.btn,
+table,
+.fade-in {
+  transition: all 0.25s ease-in-out;
+}
+
+@media (max-width: 768px) {
+  .table {
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  .table thead {
+    display: none; /* esconde cabeçalho */
+  }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+    width: 100%;
+  }
+
+  .table tr {
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0; /* tom cinza claro da sua paleta */
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    background: white;
+    padding: 0.75rem 1rem;
+  }
+
+  .table td {
+    border: none;
+    position: relative;
+    padding: 0.75rem 1rem 0.75rem 50%;
+    text-align: right;
+    font-size: 0.9rem;
+    color: #475569; /* cinza suave */
+    background: white; /* remove fundo branco pesado */
+  }
+
+  .table td:last-child {
+    border-bottom: none;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 1rem;
+    width: 45%;
+    font-weight: 600;
+    color: #1e293b; /* título mais forte */
+    text-align: left;
+  }
+
+  /* Remove alternância de linhas e hover que quebram o design */
+  .table tbody tr:nth-child(even) td {
+    background: transparent;
+  }
+
+  .table tbody tr:hover td {
+    background: transparent;
+    transform: none;
+  }
+
+}
+</style>
+
+
+{% endblock %}

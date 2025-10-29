@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  mysql:
+    build:
+      context: .
+      dockerfile: Dockerfile.mysql   # ← usa o Dockerfile customizado
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database/banco.sql.template:/docker-entrypoint-initdb.d/banco.sql.template:ro
+      - ./init-db.sh:/init-db.sh:ro
+    entrypoint: ["/bin/bash", "/init-db.sh"]
+
+  web:
+    build: .
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "80:80"
+    depends_on:
+      - mysql
+    volumes:
+      - ./data:/data
+      - ./app:/app:ro
+
+volumes:
+  db_data:

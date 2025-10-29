@@ -1,0 +1,396 @@
+<!--
+##############################################################
+# Desenvolvido por: Lucas Perdigão de Oliveira
+# Data: 29-10-2025
+#
+# Descrição:
+# Wiki para criação e gerenciamento de documentações, com suporte à:
+#  - Adição e gerenciamento de usuários e suas hierarquias
+#  - Criação e organização de hierarquias de documentações
+#  - Adição, edição e exclusão de documentações
+#  - Retenção automática de documentações excluídas por até 7 dias
+#
+##############################################################
+-->
+
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container py-4 fade-in">
+
+  <!-- Cabeçalho -->
+  <div class="doc-actions d-flex flex-shrink-0 gap-2 mt-2 mt-md-0">
+    <a href="{{ url_for('docs') }}" class="btn btn-outline-secondary btn-sm">← Voltar</a>
+    {% if session.get('nivel') == 'n3' %}
+    <a href="{{ url_for('edit_doc', slug=slug) }}" class="btn btn-outline-primary btn-sm">Editar</a>
+    <form method="post" action="{{ url_for('remove_doc', slug=slug) }}">
+      <button class="btn btn-outline-danger btn-sm"
+        onclick="return confirm('Excluir esta documentação?')">Excluir</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="doc-header d-flex flex-wrap justify-content-between align-items-start mb-4">
+    <div class="doc-title-area flex-grow-1 me-3">
+      <h1 class="fw-bold display-5 mb-1 text-break">{{ meta.title or "Sem título" }}</h1>
+      {% if meta.category %}
+      <span class="badge badge-category text-uppercase">{{ meta.category }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Capa / Ícone -->
+  {% set img_url = meta.cover_url if meta.cover_url else meta.icon_url %}
+  {% if img_url %}
+  <img src="{{ img_url }}" class="img-fluid doc-image rounded mb-4" alt="Imagem da documentação">
+  {% endif %}
+
+  <!-- Descrição -->
+  {% if meta.description %}
+  <p class="lead text-muted mb-3"><b>Descrição:</b> {{ meta.description }}</p>
+  {% endif %}
+
+  {% set tags_list = meta.tags if meta.tags is iterable and meta.tags is not string else meta.tags.split(',') %}
+  {% if tags_list %}
+  <div class="mb-4">
+    <b class="text-muted">Tags:</b>
+    <div class="mt-2 d-flex flex-wrap gap-2">
+      {% for tag in tags_list %}
+      {% if tag.strip() %}
+      <span class="badge bg-info text-dark px-2 py-1">#{{ tag.strip() }}</span>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <hr>
+
+  <div class="markdown-body p-3 bg-white rounded shadow-sm border">
+    {{ html|safe }}
+  </div>
+
+  <hr>
+
+  <div class="doc-actions d-flex flex-shrink-0 gap-2 mt-2 mt-md-0">
+    <a href="{{ url_for('docs') }}" class="btn btn-outline-secondary btn-sm">← Voltar</a>
+    {% if session.get('nivel') == 'n3' %}
+    <a href="{{ url_for('edit_doc', slug=slug) }}" class="btn btn-outline-primary btn-sm">Editar</a>
+    <form method="post" action="{{ url_for('remove_doc', slug=slug) }}">
+      <button class="btn btn-outline-danger btn-sm"
+        onclick="return confirm('Excluir esta documentação?')">Excluir</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <!-- Metadados -->
+  <div class="doc-meta mt-4 text-muted small">
+    <p class="mb-1">
+      🧑‍💻 Criado por <b>{{ meta.created_by }}</b>
+      {% if meta.created_at %} em {{ meta.created_at }}{% endif %}
+    </p>
+    <p class="mb-0">
+      ✏️ Última edição por <b>{{ meta.last_edited_by }}</b>
+      {% if meta.last_edited_at %} em {{ meta.last_edited_at }}{% endif %}
+    </p>
+  </div>
+
+</div>
+
+<style>
+/* ============================
+   ESTILO MODERNO INSPIRADO
+   ============================ */
+
+/* ---------- TIPOGRAFIA ---------- */
+h1.display-5 {
+  font-size: 2.25rem;
+  color: #212529;
+  font-weight: 600;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.markdown-body {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: #212529;
+  overflow-wrap: break-word;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+/* ---------- HEADER E LAYOUT ---------- */
+.doc-header {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
+  column-gap: 1rem;
+  align-items: center;
+}
+
+.doc-title-area {
+  min-width: 200px;
+}
+
+.doc-actions {
+  white-space: nowrap;
+  margin-bottom: 1cm;
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .doc-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .doc-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .doc-actions .btn {
+    flex: 1;
+  }
+}
+
+/* ---------- IMAGEM PRINCIPAL ---------- */
+.doc-image {
+  display: block;
+  max-height: 350px;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.8rem;
+  filter: drop-shadow(5px 10px 15px rgba(0, 0, 0, 0.25));
+  transition: transform 0.3s ease;
+}
+.doc-image:hover {
+  transform: scale(1.02);
+}
+
+/* ---------- BOTÕES MODERNOS ---------- */
+/* ---- BOTÕES ---- */
+.btn {
+  font-weight: 500;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 0.95rem;
+  border: none !important;
+  border-radius: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  color: #fff !important;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  letter-spacing: 0.02em;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  filter: brightness(1.05);
+}
+
+/* Cores modernas e suaves */
+.btn-primary {
+  background: linear-gradient(135deg, #4a90e2, #357ae8) !important;
+}
+.btn-success {
+  background: linear-gradient(135deg, #58c98a, #34a853) !important;
+}
+.btn-warning {
+  background: linear-gradient(135deg, #f9cf58, #f7b500) !important;
+  color: #fff !important;
+}
+.btn-danger {
+  background: linear-gradient(135deg, #f56a6a, #dc3545) !important;
+}
+.btn-secondary {
+  background: linear-gradient(135deg, #adb5bd, #868e96) !important;
+}
+.btn-info {
+  background: linear-gradient(135deg, #66d1ff, #0dcaf0) !important;
+}
+
+/* Hover mais suave */
+.btn:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 0.25rem rgba(90, 150, 255, 0.2) !important;
+}
+
+/* Outline buttons viram translúcidos com contraste leve */
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-warning,
+.btn-outline-danger,
+.btn-outline-secondary,
+.btn-outline-info {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  color: #333 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(4px);
+}
+
+.btn-outline-primary:hover {
+  background: linear-gradient(135deg, #4a90e2, #357ae8) !important;
+  color: #fff !important;
+}
+.btn-outline-success:hover {
+  background: linear-gradient(135deg, #58c98a, #34a853) !important;
+  color: #fff !important;
+}
+.btn-outline-warning:hover {
+  background: linear-gradient(135deg, #f9cf58, #f7b500) !important;
+  color: #fff !important;
+}
+.btn-outline-danger:hover {
+  background: linear-gradient(135deg, #f56a6a, #dc3545) !important;
+  color: #fff !important;
+}
+.btn-outline-secondary:hover {
+  background: linear-gradient(135deg, #adb5bd, #868e96) !important;
+  color: #fff !important;
+}
+.btn-outline-info:hover {
+  background: linear-gradient(135deg, #66d1ff, #0dcaf0) !important;
+  color: #fff !important;
+}
+
+/* ---------- BADGES ---------- */
+.badge-category {
+  background: #e3ebff !important;
+  color: #2c62e0 !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  letter-spacing: 0.03em;
+}
+
+.badge.bg-info {
+  background: #e7f9ff !important;
+  color: #007da8 !important;
+  font-weight: 500;
+}
+
+/* ---------- META ---------- */
+.doc-meta {
+  background: #f8f9fa;
+  border-radius: 0.8rem;
+  padding: 1rem;
+  font-size: 0.85rem;
+  color: #555;
+  border: 1px solid #eee;
+  line-height: 1.5;
+}
+
+/* ---------- ANIMAÇÃO ---------- */
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- CÓDIGO ---------- */
+.markdown-body pre {
+  background: #222 !important;
+  color: #fff !important;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.95rem;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.copy-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #444;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: all 0.2s ease;
+}
+.copy-button:hover {
+  opacity: 1;
+  background: #555;
+}
+
+/* Inline code */
+.markdown-body pre code {
+  background: transparent !important;
+  color: #ffffff !important;
+}
+
+/* ---------- TABELAS ---------- */
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid #dee2e6;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-body th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #333;
+}
+
+.markdown-body tr:nth-child(even) {
+  background: #fafafa;
+}
+
+</style>
+
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.markdown-body pre').forEach(pre => {
+      const button = document.createElement('button');
+      button.className = 'copy-button';
+      button.innerText = 'Copiar';
+      pre.appendChild(button);
+
+      button.addEventListener('click', async () => {
+        // pega o <code> dentro do <pre>, se existir
+        const codeElement = pre.querySelector('code');
+        const code = codeElement ? codeElement.innerText.trim() : pre.innerText.trim();
+
+        try {
+          await navigator.clipboard.writeText(code);
+          button.innerText = 'Copiado!';
+          setTimeout(() => (button.innerText = 'Copiar'), 1500);
+        } catch (err) {
+          console.error('Erro ao copiar:', err);
+          button.innerText = 'Erro';
+        }
+      });
+    });
+  });
+</script>
+
+{% endblock %}

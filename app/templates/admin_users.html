@@ -1,0 +1,341 @@
+<!--
+##############################################################
+# Desenvolvido por: Lucas Perdigão de Oliveira
+# Data: 29-10-2025
+#
+# Descrição:
+# Wiki para criação e gerenciamento de documentações, com suporte à:
+#  - Adição e gerenciamento de usuários e suas hierarquias
+#  - Criação e organização de hierarquias de documentações
+#  - Adição, edição e exclusão de documentações
+#  - Retenção automática de documentações excluídas por até 7 dias
+#
+##############################################################
+-->
+
+{% extends "base.html" %}
+{% block content %}
+<h2 class="fw-bold mb-4">👥 Gerenciar Usuários</h2>
+
+<a href="{{ url_for('new_user') }}" class="btn btn-success mb-3">➕ Novo Usuário</a>
+
+
+<div class="table-wrapper">
+  <table class="table align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>ID</th>
+        <th>Usuário</th>
+        <th>Nível de acesso</th>
+        <th>Criado em</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td data-label="ID">{{ u.id }}</td>
+        <td data-label="Nome">{{ u.username }}</td>
+        <td data-label="Nível de acesso">
+          {% if u.nivel == 'n3' %}
+            <span class="badge bg-danger">Admin</span>
+          {% elif u.nivel == 'n2' %}
+            <span class="badge bg-warning text-dark">Avançado</span>
+          {% else %}
+            <span class="badge bg-secondary">Básico</span>
+          {% endif %}
+        </td>
+        <td  data-label="Criação em">{{ u.created_at }}</td>
+        <td data-label="Ações">
+          <a href="{{ url_for('edit_user', user_id=u.id) }}" class="btn btn-outline-secondary">Editar</a>
+          {% if u.username != 'admin' %}
+          <form method="POST" action="{{ url_for('delete_user', user_id=u.id) }}" class="d-inline"
+                onsubmit="return confirm('Tem certeza que deseja excluir este usuário?');">
+            <button class="btn btn-sm btn-outline-danger">Excluir</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<a href="{{ url_for('docs') }}" class="btn btn-outline-secondary mt-3">← Voltar</a>
+
+<style>
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+
+/* ---- BASE ---- */
+body {
+  background: linear-gradient(180deg, #f9fbfd 0%, #f3f5f8 100%);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  color: #212529;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- TÍTULO ---- */
+h2 {
+  font-weight: 700;
+  font-size: 1.8rem;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  letter-spacing: -0.01em;
+  animation: fadeInDown 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* ---- BOTÕES ---- */
+.btn {
+  font-weight: 500;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 0.95rem;
+  border: none !important;
+  border-radius: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  color: #fff !important;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  letter-spacing: 0.02em;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  filter: brightness(1.05);
+}
+
+/* Cores modernas e suaves */
+.btn-success {
+  background: linear-gradient(135deg, #58c98a, #34a853) !important;
+}
+.btn-danger {
+  background: linear-gradient(135deg, #f56a6a, #dc3545) !important;
+}
+.btn-secondary {
+  background: linear-gradient(135deg, #adb5bd, #868e96) !important;
+}
+/* Hover mais suave */
+.btn:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 0.25rem rgba(90, 150, 255, 0.2) !important;
+}
+
+/* Outline buttons viram translúcidos com contraste leve */
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-warning,
+.btn-outline-danger,
+.btn-outline-secondary,
+.btn-outline-info {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  color: #333 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(4px);
+}
+
+.btn-outline-success:hover {
+  background: linear-gradient(135deg, #58c98a, #34a853) !important;
+  color: #fff !important;
+}
+.btn-outline-danger:hover {
+  background: linear-gradient(135deg, #f56a6a, #dc3545) !important;
+  color: #fff !important;
+}
+.btn-outline-secondary:hover {
+  background: linear-gradient(135deg, #adb5bd, #868e96) !important;
+  color: #fff !important;
+}
+
+/* ---- TABELA MODERNA ---- */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  animation: fadeInUp 0.6s ease;
+}
+
+.table thead {
+  background: linear-gradient(180deg, #eef2f7, #e3e9f0);
+  border-bottom: 2px solid #d9e1ec;
+}
+
+.table th {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  color: #334155;
+  padding: 1rem;
+  text-align: left;
+}
+
+.table tbody tr {
+  transition: background 0.25s ease, transform 0.2s ease;
+}
+
+.table td {
+  padding: 0.9rem 1rem;
+  font-size: 0.95rem;
+  color: #475569;
+  border-top: 1px solid #f1f3f5;
+  background: #fff;
+}
+
+/* Alterna levemente as linhas para melhor leitura */
+.table tbody tr:nth-child(even) td {
+  background: #fafbfc;
+}
+
+/* Efeito hover delicado */
+.table tbody tr:hover td {
+  background: #f0f7ff;
+  transform: translateY(-1px);
+}
+
+/* Primeira coluna mais destacada */
+.table tbody td:first-child {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+
+/* ---- BADGES ---- */
+.badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 1rem;
+  padding: 0.4em 0.8em;
+  display: inline-block;
+  letter-spacing: 0.02em;
+  min-width: 80px;
+  text-align: center;
+}
+
+.badge.bg-danger {
+  background: #fee2e2 !important;
+  color: #b91c1c !important;
+}
+.badge.bg-warning {
+  background: #fef9c3 !important;
+  color: #92400e !important;
+}
+.badge.bg-secondary {
+  background: #e2e8f0 !important;
+  color: #334155 !important;
+}
+
+/* ---- ANIMAÇÕES ---- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---- RESPONSIVIDADE ---- */
+@media (max-width: 768px) {
+  .table {
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  .table thead {
+    display: none; /* esconde cabeçalho */
+  }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+    width: 100%;
+  }
+
+  .table tr {
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0; /* tom cinza claro da sua paleta */
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    background: white;
+    padding: 0.75rem 1rem;
+  }
+
+  .table td {
+    border: none;
+    position: relative;
+    padding: 0.75rem 1rem 0.75rem 50%;
+    text-align: right;
+    font-size: 0.9rem;
+    color: #475569; /* cinza suave */
+    background: white; /* remove fundo branco pesado */
+  }
+
+  .table td:last-child {
+    border-bottom: none;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 1rem;
+    width: 45%;
+    font-weight: 600;
+    color: #1e293b; /* título mais forte */
+    text-align: left;
+  }
+
+  /* Remove alternância de linhas e hover que quebram o design */
+  .table tbody tr:nth-child(even) td {
+    background: transparent;
+  }
+
+  .table tbody tr:hover td {
+    background: transparent;
+    transform: none;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  .btn-success {
+    width: 100%;
+  }
+
+  .btn-sm {
+    margin: 3px 0;
+    padding: 0.4rem 0.7rem;
+
+  }
+}
+</style>
+
+
+{% endblock %}
