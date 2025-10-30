@@ -13,6 +13,7 @@
 
 import os
 import time
+import json
 import mysql.connector
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -24,6 +25,7 @@ from pathlib import Path
 from slugify import slugify
 from config import Config
 from storage import ensure_dirs_and_repo, list_docs, read_doc, save_doc, delete_doc, upload_file, DOCS_DIR
+from datetime import datetime
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = Config.SECRET_KEY
@@ -85,11 +87,50 @@ def ensure_database():
             pass
 
 
+def ensure_tables_and_seed():
+    """
+    Cria as tabelas necessárias e faz seed do usuário admin, se não existir.
+    """
+    cnx = connect_mysql(db_required=True)
+    cur = cnx.cursor()
+
+    # Tabela de usuários
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(150) NOT NULL UNIQUE,
+            password_hash VARCHAR(255) NOT NULL,
+            nivel ENUM('n1','n2','n3') DEFAULT 'n1',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """
+    )
+
+
+    # Seed do admin
+    cur.execute("SELECT id FROM usuarios WHERE username=%s LIMIT 1;", (ADMIN_USER,))
+    row = cur.fetchone()
+    if not row:
+        cur.execute(
+            "INSERT INTO usuarios (username, password_hash, nivel) VALUES (%s, %s, 'n3');",
+            (ADMIN_USER, generate_password_hash(ADMIN_PASS))
+        )
+        print(f"👑 Usuário admin criado: {ADMIN_USER}")
+
+    cnx.commit()
+    cur.close()
+    cnx.close()
+
+
 # Orquestra o bootstrap do banco
 wait_mysql()
 # Se o container mysql acabou de iniciar a primeira vez, o DB já existe por causa do compose.
 # Se o volume foi recriado/limpo, a linha abaixo garante o DB:
 ensure_database()
+# Cria tabelas e faz seed
+ensure_tables_and_seed()
+
 
 # =========================
 # Utilidades web
@@ -402,12 +443,32 @@ def view_doc(slug):
     # Gera CSS para syntax highlight do Pygments
     css = HtmlFormatter().get_style_defs(".codehilite")
 
+    comments_path = os.path.join(DATA_DIR, "docs", slug, "comments.json")
+
+    comments = []
+    if os.path.exists(comments_path):
+        with open(comments_path, "r", encoding="utf-8") as f:
+            comments = json.load(f)
+
+        # Garante que todos tenham um ID (para compatibilidade retroativa)
+        from datetime import datetime
+        changed = False
+        for c in comments:
+            if "id" not in c:
+                c["id"] = int(datetime.now().timestamp())
+                changed = True
+
+        if changed:
+            with open(comments_path, "w", encoding="utf-8") as f:
+                json.dump(comments, f, ensure_ascii=False, indent=2)
+    
     # Renderiza template passando HTML + CSS
     return render_template(
         "doc_view.html",
         html=html,
         code_css=css,
         slug=slug,
+        comments=comments,
         meta=post.metadata
     )
 
@@ -473,6 +534,164 @@ def edit_doc(slug):
         cover_url=post.get("cover_url", ""),
         slug=slug
     )
+
+def load_json(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return []
+app.jinja_env.globals.update(load_json=load_json)
+
+@app.route("/add_comment/<slug>", methods=["POST"])
+@nivel_required("n2", "n3")
+def add_comment(slug):
+    from datetime import datetime
+
+    justificativa = request.form.get("justificativa")
+    conteudo = request.form.get("conteudo")
+
+    # aqui, use a mesma chave que você usa no login
+    usuario = session.get("usuario") or session.get("user") or session.get("username")
+
+    if not usuario:
+        flash("Não foi possível identificar o usuário logado.", "danger")
+        return redirect(url_for("view_doc", slug=slug))
+
+    if not justificativa or not conteudo:
+        flash("Preencha todos os campos para enviar o comentário.", "warning")
+        return redirect(url_for("view_doc", slug=slug))
+
+    comments_path = os.path.join(DATA_DIR, "docs", slug, "comments.json")
+
+    comentarios = []
+    if os.path.exists(comments_path):
+        with open(comments_path, "r", encoding="utf-8") as f:
+            comentarios = json.load(f)
+
+    comentarios.append({
+        "usuario": usuario,
+        "justificativa": justificativa.strip(),
+        "conteudo": conteudo.strip(),
+        "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "id": int(datetime.now().timestamp())  # gera ID único simples
+    })
+
+    with open(comments_path, "w", encoding="utf-8") as f:
+        json.dump(comentarios, f, ensure_ascii=False, indent=2)
+
+    flash("Comentário adicionado com sucesso!", "success")
+    return redirect(url_for("view_doc", slug=slug))
+
+@app.route("/add_reply/<slug>/<int:comment_id>", methods=["POST"])
+@nivel_required("n2", "n3")
+def add_reply(slug, comment_id):
+    from datetime import datetime
+
+    conteudo = request.form.get("conteudo")
+    usuario = session.get("usuario") or session.get("user") or session.get("username")
+
+    if not usuario or not conteudo:
+        flash("Preencha o conteúdo da resposta.", "warning")
+        return redirect(url_for("view_doc", slug=slug))
+
+    comments_path = os.path.join(DATA_DIR, "docs", slug, "comments.json")
+
+    comentarios = []
+    if os.path.exists(comments_path):
+        with open(comments_path, "r", encoding="utf-8") as f:
+            comentarios = json.load(f)
+
+    # Encontra o comentário original
+    for c in comentarios:
+        if c["id"] == comment_id:
+            if "replies" not in c:
+                c["replies"] = []
+            c["replies"].append({
+                "usuario": usuario,
+                "conteudo": conteudo.strip(),
+                "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "id": int(datetime.now().timestamp())
+            })
+            break
+
+    with open(comments_path, "w", encoding="utf-8") as f:
+        json.dump(comentarios, f, ensure_ascii=False, indent=2)
+
+    flash("Resposta adicionada com sucesso!", "success")
+    return redirect(url_for("view_doc", slug=slug))
+
+@app.route("/delete_comment/<slug>/<int:comment_id>", methods=["POST"])
+@nivel_required("n2", "n3")
+def delete_comment(slug, comment_id):
+    usuario = session.get("user") or session.get("usuario") or session.get("username")
+    nivel = session.get("nivel")
+
+    comments_path = os.path.join(DATA_DIR, "docs", slug, "comments.json")
+    if not os.path.exists(comments_path):
+        flash("Nenhum comentário encontrado.", "warning")
+        return redirect(url_for("view_doc", slug=slug))
+
+    with open(comments_path, "r", encoding="utf-8") as f:
+        comentarios = json.load(f)
+
+    # Filtro: admin (n3) pode apagar todos; n2 apenas os próprios
+    novos = []
+    apagou = False
+    for c in comentarios:
+        if c["id"] == comment_id:
+            if nivel == "n3" or c["usuario"] == usuario:
+                apagou = True
+                continue  # não inclui no novo arquivo (remove)
+        novos.append(c)
+
+    with open(comments_path, "w", encoding="utf-8") as f:
+        json.dump(novos, f, ensure_ascii=False, indent=2)
+
+    if apagou:
+        flash("Comentário excluído com sucesso!", "success")
+    else:
+        flash("Você não tem permissão para apagar este comentário.", "danger")
+
+    return redirect(url_for("view_doc", slug=slug))
+
+@app.route("/delete_reply/<slug>/<int:comment_id>/<int:reply_id>", methods=["POST"])
+@nivel_required("n2", "n3")
+def delete_reply(slug, comment_id, reply_id):
+    usuario = session.get("user") or session.get("usuario") or session.get("username")
+    nivel = session.get("nivel")
+
+    comments_path = os.path.join(DATA_DIR, "docs", slug, "comments.json")
+    if not os.path.exists(comments_path):
+        flash("Nenhum comentário encontrado.", "warning")
+        return redirect(url_for("view_doc", slug=slug))
+
+    with open(comments_path, "r", encoding="utf-8") as f:
+        comentarios = json.load(f)
+
+    apagou = False
+
+    # Percorre os comentários e suas respostas
+    for c in comentarios:
+        if c.get("id") == comment_id and "replies" in c:
+            novas_replies = []
+            for r in c["replies"]:
+                if r.get("id") == reply_id:
+                    if nivel == "n3" or r.get("usuario") == usuario:
+                        apagou = True
+                        continue  # pula (remove)
+                novas_replies.append(r)
+            c["replies"] = novas_replies
+
+    with open(comments_path, "w", encoding="utf-8") as f:
+        json.dump(comentarios, f, ensure_ascii=False, indent=2)
+
+    if apagou:
+        flash("Resposta excluída com sucesso!", "success")
+    else:
+        flash("Você não tem permissão para apagar esta resposta.", "danger")
+
+    return redirect(url_for("view_doc", slug=slug))
 
 @app.route("/docs/<slug>/delete", methods=["POST"])
 @login_required
