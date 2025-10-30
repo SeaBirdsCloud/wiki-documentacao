@@ -28,7 +28,8 @@
       <!-- Nível de acesso -->
       <div class="mb-3">
         <label class="form-label fw-semibold">Nível de acesso:</label>
-        <select name="access_level" class="form-select">
+        <select name="access_level" class="form-select" required>
+          <option value="" disabled selected>Selecione o nível</option>
           <option value="d1" {% if meta and meta.access_level=="d1" %}selected{% endif %}>Aberto (d1)</option>
           <option value="d2" {% if meta and meta.access_level=="d2" %}selected{% endif %}>Restrito (d2)</option>
           <option value="d3" {% if meta and meta.access_level=="d3" %}selected{% endif %}>Privado (d3)</option>
