@@ -1,0 +1,9 @@
+[
+  {
+    "usuario": "user2",
+    "justificativa": "Erro no comando",
+    "conteudo": "docker ps",
+    "data": "2025-10-30 17:25:37",
+    "id": 1761845137
+  }
+]

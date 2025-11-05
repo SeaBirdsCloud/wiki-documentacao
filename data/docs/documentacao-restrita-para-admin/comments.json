@@ -1,0 +1,17 @@
+[
+  {
+    "usuario": "user3",
+    "justificativa": "Teste de comentário",
+    "conteudo": "POSITIVO S+",
+    "data": "2025-10-30 17:07:18",
+    "id": 1761844038,
+    "replies": [
+      {
+        "usuario": "user3",
+        "conteudo": "Hellow word!",
+        "data": "2025-10-30 17:24:41",
+        "id": 1761845081
+      }
+    ]
+  }
+]
